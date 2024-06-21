@@ -1,41 +1,24 @@
 import numpy as np
-from src.star_class import StellarModel
-from config.config import M_total, X, Y, R_total, L_total, T_central, K, Na, max_err
+import matplotlib.pyplot as plt
+import pandas as pd
+from config.config import K, Na, max_err, M_total, X, Y, T_central, R_total, L_total, M_test, X_test, Y_test, T_test, R_test, L_test
+from src.star_class import StellarModel, Results
 
-"""
-def run_model():
-    L_total = 40  # luminosidad total, ejemplo
-    R_total = 12  # radio total, ejemplo
-    T_central = 1.5e7  # temperatura central, ejemplo
 
-    reversal('surface')
-    R, k_polytrope = radiative_envelope(R_total, L_total)
-    T = convective_core(0, k_polytrope, 0, 'surface')
+# We create an instance of the class StellarModel with the parameters of the test case
+test = StellarModel(M_test, X_test, Y_test, T_test, R_test, L_test)
+test.complete_model()
+test_initial_results = Results(test.R, test.P, test.T, test.L, test.M)
+print("Total error: ", test.error)
 
-    # Guardar o mostrar los resultados
-    print("Radii:", R)
-    print("Temperatures:", T)
+# We build the range of values for the central temperature to optimize the calculation
+T_values = np.arange(test.T_central - 0.5, test.T_central + 0.5, 0.01)
+test.optimal_temperature_calculation(T_values, plot=True)
+# We make a thinner range of values for the central temperature to optimize the calculation
+T_values = np.arange(test.T_central - 0.05, test.T_central + 0.05, 0.001)
+test.optimal_temperature_calculation(T_values, plot=True)
+test_optimal_temperature_results = Results(test)
 
-if __name__ == "__main__":
-    run_model()
-
-"""
-
-M = 5
-X = 0.75
-Y = 0.2
-T_central = 1.5
-R_total = 12
-L_total = 40
-
-star = StellarModel(M, X, Y, T_central, R_total, L_total)
-T_values = np.arange(star.T_central - 0.5, star.T_central + 0.5, 0.01)
-star.optimal_temperature_calculation(T_values, plot=True)
-T_values = np.arange(star.T_central - 0.05, star.T_central + 0.05, 0.001)
-star.optimal_temperature_calculation(T_values, plot=True)
-
-R_values = np.linspace(11.52, 11.78, 11)
-L_values = np.linspace(44.25, 46.75, 11)
-matrix_error = star.optimal_grid_calculation(R_values, L_values, T_values)
-star.plot_matrix_error(matrix_error, R_values, L_values, "contour")
-star.plot_matrix_error(matrix_error, R_values, L_values, "pixels")
+# We create a grid of values for the total luminosity and the total radius to optimize the calculation
+L_values = np.arange(test.L_total - 0.5, test.L_total + 0.5, 0.01)
+R_values = np.arange(test.R_total - 0.5, test.R_total + 0.5, 0.01)

@@ -541,7 +541,7 @@ class StellarModel:
         # We compute the transition layer outwards
         up_values = self.transition_layer_up(R_down, m)
         # We compute the error in the transition layer
-        total_relative_error = self.calculate_relative_errors(down_values, up_values)
+        self.error = self.calculate_relative_errors(down_values, up_values)
         # We compute the extra layers
         R_extra, P_extra, T_extra, L_extra, M_extra = self.extra_layers()
         # We append the extra layers to the arrays
@@ -550,7 +550,6 @@ class StellarModel:
         self.T = np.append(self.T, T_extra[::-1])
         self.M = np.append(self.M, M_extra[::-1])
         self.L = np.append(self.L, L_extra[::-1])
-        self.error = total_relative_error
     
 
     def optimal_temperature_calculation(self, T_values, plot = False):
@@ -580,6 +579,11 @@ class StellarModel:
 
         self.T_central = T_values[np.argmin(array_error)]
         self.error = np.min(array_error)
+
+        # Now that we have the optimal temperature, we compute the complete model
+        self.initialize_parameters()
+        self.initialize_arrays()
+        self.complete_model()
 
         if plot:
             # Now we plot the total relative error as a function of the central temperature
@@ -632,7 +636,7 @@ class StellarModel:
         return matrix_error
     
 
-    def plot_matrix_error(self, matrix_error, R_values, L_values, plot):
+    def plot_matrix_error(self, matrix_error, R_values, L_values, plot = True):
         """
         Plots the total relative error as a function of the total radius and luminosity.
 
@@ -642,7 +646,7 @@ class StellarModel:
         - L_values: An array of total luminosity values to iterate over.
         - plot: A string that determines the type of plot to display ('contour' or 'pixels').
         """
-        if plot == "contour":
+        if plot:
             # We plot the total relative error as a function of the total radius and luminosity
             plt.figure()
             plt.contourf(L_values, R_values, matrix_error, levels=20)
@@ -653,7 +657,6 @@ class StellarModel:
             plt.grid()
             plt.show()
 
-        elif plot == "pixels":
             plt.figure()
             plt.imshow(matrix_error.T, extent=[R_values.min(), R_values.max(), L_values.min(), L_values.max()],
                     origin='lower', aspect='auto', interpolation='none', cmap='viridis')
@@ -663,3 +666,73 @@ class StellarModel:
             plt.title('Total Relative Error vs. Total Radius and Luminosity')
             plt.grid(False)
             plt.show()
+
+
+def Results(R, P, T, L, M):
+
+    df = pd.DataFrame({
+        'r': R,
+        'P': P,
+        'T': T,
+        'L': L,
+        'M': M,
+    })
+
+    # We use .style.format to specify individual formats
+    formatted_df = df.style.format({
+        'r': "{:.5f}",
+        'P': "{:,.7f}",
+        'T': "{:.7f}",
+        'L': "{:.6f}",
+        'M': "{:.6f}"
+    })
+
+    # We make the plot of the complete model of the star, R vs M, R vs L, R vs T, R vs P
+    """
+    plt.figure()
+    plt.plot(R, M)
+    plt.xlabel('Radius (R)')
+    plt.ylabel('Mass (M)')
+    plt.title('Mass vs. Radius')
+    plt.grid()
+    plt.show()
+
+    plt.figure()
+    plt.plot(R, L)
+    plt.xlabel('Radius (R)')
+    plt.ylabel('Luminosity (L)')
+    plt.title('Luminosity vs. Radius')
+    plt.grid()
+    plt.show()
+
+    plt.figure()
+    plt.plot(R, T)
+    plt.xlabel('Radius (R)')
+    plt.ylabel('Temperature (K)')
+    plt.title('Temperature vs. Radius')
+    plt.grid()
+    plt.show()
+
+    plt.figure()
+    plt.plot(R, P)
+    plt.xlabel('Radius (R)')
+    plt.ylabel('Pressure (P)')
+    plt.title('Pressure vs. Radius')
+    plt.grid()
+    plt.show()
+    """
+
+    # Now we plot in a single plot all the variables normalized by their central values
+    plt.figure()
+    plt.plot(R, M/M[-1])
+    plt.plot(R, L/L[-1])
+    plt.plot(R, T/T[0])
+    plt.plot(R, P/P[0])
+    plt.xlabel('Radius (R)')
+    plt.ylabel('Normalized Values')
+    plt.title('Normalized Variables vs. Radius')
+    plt.legend(['Mass', 'Luminosity', 'Temperature', 'Pressure'])
+    plt.grid()
+    plt.show()
+
+    return formatted_df
