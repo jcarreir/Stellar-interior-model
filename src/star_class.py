@@ -550,6 +550,8 @@ class StellarModel:
         self.T = np.append(self.T, T_extra[::-1])
         self.M = np.append(self.M, M_extra[::-1])
         self.L = np.append(self.L, L_extra[::-1])
+        # We complete transport_parameter array with zeros
+        self.transport_parameter = np.append(self.transport_parameter, np.zeros(len(R_extra)))
     
 
     def optimal_temperature_calculation(self, T_values, plot = False):
@@ -593,7 +595,6 @@ class StellarModel:
             plt.axvline(x=T_values[np.argmin(array_error)], color='r', linestyle='--')
             plt.xlabel('Central Temperature ($10^7$ K)')
             plt.ylabel('Total Relative Error (%)')
-            plt.title('Total Relative Error vs. Central Temperature')
             plt.grid()
             plt.legend(['Total Relative Error', 'Minimum Total Relative Error'])
             plt.show()
@@ -614,12 +615,12 @@ class StellarModel:
         - R_values: An array of total radius values to iterate over.
         - L_values: An array of total luminosity values to iterate over.
         - T_values: An array of central temperatures to use in the calculations.
-        - plot: A string that determines the type of plot to display ('contour' or 'pixels').
 
         Returns:
         - matrix_error: A matrix of total relative errors for each combination of total radius and luminosity.
         """
         matrix_error = np.zeros((len(R_values), len(L_values)))
+        matrix_temperature = np.zeros((len(R_values), len(L_values)))
 
         for i, R_total in enumerate(R_values):
             self.R_total = R_total
@@ -627,11 +628,21 @@ class StellarModel:
                 self.L_total = L_total
                 self.optimal_temperature_calculation(T_values)
                 matrix_error[i, j] = self.error
+                matrix_temperature[i, j] = self.T_central
 
         self.error = np.min(matrix_error)
+        self.T_central = np.min(matrix_temperature)
         i, j = np.unravel_index(np.argmin(matrix_error, axis=None), matrix_error.shape)
         self.R_total = R_values[i]
         self.L_total = L_values[j]
+        # Print the central temperature that minimizes the total relative error
+        print("Central Temperature that minimizes the Total Relative Error (K):", self.T_central)
+        # Print the total radius that minimizes the total relative error
+        print("Total Radius that minimizes the Total Relative Error ($R_{\odot}$):", self.R_total)
+        # Print the total luminosity that minimizes the total relative error
+        print("Total Luminosity that minimizes the Total Relative Error ($L_{\odot}$):", self.L_total)
+        # Print the minimum total relative error
+        print("Minimum Total Relative Error (%):", self.error)
 
         return matrix_error
     
@@ -644,95 +655,65 @@ class StellarModel:
         - matrix_error: A matrix of total relative errors for each combination of total radius and luminosity.
         - R_values: An array of total radius values to iterate over.
         - L_values: An array of total luminosity values to iterate over.
-        - plot: A string that determines the type of plot to display ('contour' or 'pixels').
+        - plot: A boolean value that determines whether the plot should be displayed.
         """
         if plot:
-            # We plot the total relative error as a function of the total radius and luminosity
+            # We plot the total relative error as a function of the total radius and luminosity in a pixel plot
+            # Radius in vertical axis, Luminosity in horizontal axis
             plt.figure()
-            plt.contourf(L_values, R_values, matrix_error, levels=20)
-            plt.colorbar()
-            plt.xlabel('Total Luminosity ($L_{\odot}$)')
-            plt.ylabel('Total Radius ($R_{\odot}$)')
-            plt.title('Total Relative Error vs. Total Radius and Luminosity')
-            plt.grid()
-            plt.show()
-
-            plt.figure()
-            plt.imshow(matrix_error.T, extent=[R_values.min(), R_values.max(), L_values.min(), L_values.max()],
-                    origin='lower', aspect='auto', interpolation='none', cmap='viridis')
-            plt.colorbar()
-            plt.xlabel('Total Radius ($R_{\odot}$)')
-            plt.ylabel('Total Luminosity ($L_{\odot}$)')
-            plt.title('Total Relative Error vs. Total Radius and Luminosity')
+            plt.imshow(matrix_error, extent=[min(L_values), max(L_values), max(R_values), min(R_values)], aspect='auto')
+            plt.colorbar(label='Total Relative Error (%)')
+            plt.xlabel('Total Luminosity ($10^{33}$ erg/s)')
+            plt.ylabel('Total Radius ($10^{10}$ cm)')
             plt.grid(False)
             plt.show()
 
 
-def Results(R, P, T, L, M):
+    def extra_variables_calculation(self):
+        """
+        Computes the extra variables of the star, such as the density, opacity, and energy generation rate.
+        """
+        # Compute the density
+        self.Rho = self.mu * self.P / (K * Na * self.T)
+        # Compute the energy generation rate
+        self.epsilon, self.nu, self.cycle, self.C_l = self.energy_generation_rate(self.T, self.P)
 
-    df = pd.DataFrame({
-        'r': R,
-        'P': P,
-        'T': T,
-        'L': L,
-        'M': M,
-    })
 
-    # We use .style.format to specify individual formats
-    formatted_df = df.style.format({
-        'r': "{:.5f}",
-        'P': "{:,.7f}",
-        'T': "{:.7f}",
-        'L': "{:.6f}",
-        'M': "{:.6f}"
-    })
+    def plot_normalized_variables(self):
+        """
+        Plots the star's properties normalized by their maximum values as a function of the normalized radius.
+        """
+        plt.figure()
+        plt.plot(self.R / self.R_total, self.M / self.M[-1], label='Mass')
+        plt.plot(self.R / self.R_total, self.L / self.L[-1], label='Luminosity')
+        plt.plot(self.R / self.R_total, self.T / self.T[0], label='Temperature')
+        plt.plot(self.R / self.R_total, self.P / self.P[0], label='Pressure')
+        plt.plot(self.R / self.R_total, self.Rho / self.Rho[0], label='Density')
+        plt.xlabel('Radius ($10^{10}$ cm)')
+        plt.ylabel('Normalized Values')
+        plt.legend()
+        plt.grid()
+        plt.show()
 
-    # We make the plot of the complete model of the star, R vs M, R vs L, R vs T, R vs P
-    """
-    plt.figure()
-    plt.plot(R, M)
-    plt.xlabel('Radius (R)')
-    plt.ylabel('Mass (M)')
-    plt.title('Mass vs. Radius')
-    plt.grid()
-    plt.show()
+    
+    def save_data(self, filename):
+        """
+        Saves the star's properties to a CSV file.
 
-    plt.figure()
-    plt.plot(R, L)
-    plt.xlabel('Radius (R)')
-    plt.ylabel('Luminosity (L)')
-    plt.title('Luminosity vs. Radius')
-    plt.grid()
-    plt.show()
-
-    plt.figure()
-    plt.plot(R, T)
-    plt.xlabel('Radius (R)')
-    plt.ylabel('Temperature (K)')
-    plt.title('Temperature vs. Radius')
-    plt.grid()
-    plt.show()
-
-    plt.figure()
-    plt.plot(R, P)
-    plt.xlabel('Radius (R)')
-    plt.ylabel('Pressure (P)')
-    plt.title('Pressure vs. Radius')
-    plt.grid()
-    plt.show()
-    """
-
-    # Now we plot in a single plot all the variables normalized by their central values
-    plt.figure()
-    plt.plot(R, M/M[-1])
-    plt.plot(R, L/L[-1])
-    plt.plot(R, T/T[0])
-    plt.plot(R, P/P[0])
-    plt.xlabel('Radius (R)')
-    plt.ylabel('Normalized Values')
-    plt.title('Normalized Variables vs. Radius')
-    plt.legend(['Mass', 'Luminosity', 'Temperature', 'Pressure'])
-    plt.grid()
-    plt.show()
-
-    return formatted_df
+        Parameters:
+        - filename: The name of the file to save the data.
+        """
+        # Create a DataFrame with the star's properties
+        df = pd.DataFrame({
+            'Radius': self.R,
+            'Pressure': self.P,
+            'Temperature': self.T,
+            'Luminosity': self.L,
+            'Mass': self.M,
+            'Density': self.Rho,
+            'Energy Generation Rate': self.epsilon,
+            'Transport Parameter': self.transport_parameter,
+            'Cycle': self.cycle,
+        })
+        # Save the DataFrame to a CSV file
+        df.to_csv(filename, index=False)
