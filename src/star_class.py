@@ -538,6 +538,8 @@ class StellarModel:
         j = self.three_layers_core()
         # We compute the convective core outwards
         m = self.convective_core(j, R_down, "center")
+        # We save the value of the layer where the transition layer is located
+        self.transition_layer_index = m
         # We compute the transition layer outwards
         up_values = self.transition_layer_up(R_down, m)
         # We compute the error in the transition layer
@@ -697,7 +699,7 @@ class StellarModel:
             self.epsilon[i], self.nu[i], self.cycle[i], self.C_l[i] = self.energy_generation_rate(self.T[i], self.P[i])
 
 
-    def plot_normalized_variables(self, variable = 'all', independent_variable = 'radius'):
+    def plot_normalized_variables(self, variable = 'all', independent_variable = 'radius', vertical_line = False):
         """
         Plots the star's properties normalized by their maximum values as a function of the normalized radius.
 
@@ -719,11 +721,14 @@ class StellarModel:
 
         if variable == 'all':
             plt.figure()
+            if  vertical_line:
+                plt.axvline(x=self.R[self.transition_layer_index] / self.R[-1], color='k', linestyle='--', label = 'Transition Layer')
             plt.plot(independent_variable, dependent_variable / dependent_variable[-1], label = label)
             plt.plot(independent_variable, self.L / self.L[-1], label='Luminosity')
             plt.plot(independent_variable, self.T / self.T[0], label='Temperature')
             plt.plot(independent_variable, self.P / self.P[0], label='Pressure')
             plt.plot(independent_variable, self.Rho / self.Rho[0], label='Density')
+            
             plt.xlabel(xlabel)
             plt.ylabel('Normalized Values')
             plt.legend()
