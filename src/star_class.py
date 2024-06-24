@@ -554,7 +554,7 @@ class StellarModel:
         self.transport_parameter = np.append(self.transport_parameter, np.zeros(len(R_extra)))
     
 
-    def optimal_temperature_calculation(self, T_values, plot = False):
+    def optimal_temperature_calculation(self, T_values):
         """
         Computes the central temperature that minimizes the total relative error
         by iterating over a range of central temperatures and calculating the total relative error
@@ -562,8 +562,9 @@ class StellarModel:
 
         Parameters:
         - T_values: An array of central temperatures to iterate over.
-        - plot: A boolean value that determines whether a plot of the total relative error
-                as a function of the central temperature should be displayed.
+
+        Returns:
+        - array_error: An array of total relative errors for each central temperature.
         """
         # We define an array to store the total relative error for each central temperature
         array_error = np.zeros(len(T_values))
@@ -587,22 +588,30 @@ class StellarModel:
         self.initialize_arrays()
         self.complete_model()
 
-        if plot:
-            # Now we plot the total relative error as a function of the central temperature
-            # And we show the central temperature that minimizes the total relative error
-            plt.figure()
-            plt.plot(T_values, array_error)
-            plt.axvline(x=T_values[np.argmin(array_error)], color='r', linestyle='--')
-            plt.xlabel('Central Temperature ($10^7$ K)')
-            plt.ylabel('Total Relative Error (%)')
-            plt.grid()
-            plt.legend(['Total Relative Error', 'Minimum Total Relative Error'])
-            plt.show()
+        # Print the central temperature that minimizes the total relative error
+        print("Central Temperature that minimizes the Total Relative Error (K):", T_values[np.argmin(array_error)])
+        # Print the minimum total relative error
+        print("Minimum Total Relative Error (%):", np.min(array_error))
 
-            # Print the central temperature that minimizes the total relative error
-            print("Central Temperature that minimizes the Total Relative Error (K):", T_values[np.argmin(array_error)])
-            # Print the minimum total relative error
-            print("Minimum Total Relative Error (%):", np.min(array_error))
+        return array_error
+
+    
+    def plot_array_error(self, T_values, array_error):
+        """
+        Plots the total relative error as a function of the central temperature.
+
+        Parameters:
+        - T_values: An array of central temperatures to iterate over.
+        - array_error: An array of total relative errors for each central temperature.
+        """
+        plt.figure()
+        plt.plot(T_values, array_error)
+        plt.axvline(x=T_values[np.argmin(array_error)], color='r', linestyle='--')
+        plt.xlabel('Central Temperature ($10^7$ K)')
+        plt.ylabel('Total Relative Error (%)')
+        plt.grid()
+        plt.legend(['Total Relative Error', 'Minimum Total Relative Error'])
+        plt.show()
 
 
     def optimal_grid_calculation(self, R_values, L_values, T_values):
@@ -635,19 +644,20 @@ class StellarModel:
         i, j = np.unravel_index(np.argmin(matrix_error, axis=None), matrix_error.shape)
         self.R_total = R_values[i]
         self.L_total = L_values[j]
+        print("----------------------------------------------------------------------------------")
         # Print the central temperature that minimizes the total relative error
         print("Central Temperature that minimizes the Total Relative Error (K):", self.T_central)
         # Print the total radius that minimizes the total relative error
-        print("Total Radius that minimizes the Total Relative Error ($R_{\odot}$):", self.R_total)
+        print("Total Radius that minimizes the Total Relative Error ($10^{10}$ cm):", self.R_total)
         # Print the total luminosity that minimizes the total relative error
-        print("Total Luminosity that minimizes the Total Relative Error ($L_{\odot}$):", self.L_total)
+        print("Total Luminosity that minimizes the Total Relative Error ($10^{33}$ erg/s):", self.L_total)
         # Print the minimum total relative error
         print("Minimum Total Relative Error (%):", self.error)
 
         return matrix_error
     
 
-    def plot_matrix_error(self, matrix_error, R_values, L_values, plot = True):
+    def plot_matrix_error(self, matrix_error, R_values, L_values):
         """
         Plots the total relative error as a function of the total radius and luminosity.
 
@@ -657,43 +667,119 @@ class StellarModel:
         - L_values: An array of total luminosity values to iterate over.
         - plot: A boolean value that determines whether the plot should be displayed.
         """
-        if plot:
-            # We plot the total relative error as a function of the total radius and luminosity in a pixel plot
-            # Radius in vertical axis, Luminosity in horizontal axis
-            plt.figure()
-            plt.imshow(matrix_error, extent=[min(L_values), max(L_values), max(R_values), min(R_values)], aspect='auto')
-            plt.colorbar(label='Total Relative Error (%)')
-            plt.xlabel('Total Luminosity ($10^{33}$ erg/s)')
-            plt.ylabel('Total Radius ($10^{10}$ cm)')
-            plt.grid(False)
-            plt.show()
+        # Radius in vertical axis, Luminosity in horizontal axis
+        plt.figure()
+        plt.imshow(matrix_error, extent=[min(L_values), max(L_values), max(R_values), min(R_values)], aspect='auto')
+        plt.colorbar(label='Total Relative Error (%)')
+        plt.xlabel('Total Luminosity ($10^{33}$ erg/s)')
+        plt.ylabel('Total Radius ($10^{10}$ cm)')
+        plt.grid(False)
+        plt.show()
 
 
     def extra_variables_calculation(self):
         """
         Computes the extra variables of the star, such as the density, opacity, and energy generation rate.
         """
-        # Compute the density
-        self.Rho = self.mu * self.P / (K * Na * self.T)
-        # Compute the energy generation rate
-        self.epsilon, self.nu, self.cycle, self.C_l = self.energy_generation_rate(self.T, self.P)
+        # Initialize the arrays for the extra variables
+        self.Rho = np.zeros_like(self.R)
+        self.epsilon = np.zeros_like(self.R)
+        self.nu = np.zeros_like(self.R)
+        self.cycle = np.zeros_like(self.R, dtype=str)
+        self.C_l = np.zeros_like(self.R)
+        for i in range(len(self.T)):
+            # Compute the density
+            if self.T[i] == 0:
+                self.Rho[i] = 0
+            else:
+                self.Rho[i] = self.mu * self.P[i] / (K * Na * self.T[i])
+            # Compute the energy generation rate
+            self.epsilon[i], self.nu[i], self.cycle[i], self.C_l[i] = self.energy_generation_rate(self.T[i], self.P[i])
 
 
-    def plot_normalized_variables(self):
+    def plot_normalized_variables(self, variable = 'all', independent_variable = 'radius'):
         """
         Plots the star's properties normalized by their maximum values as a function of the normalized radius.
+
+        Parameters:
+        - variable: The variable to plot ('all', 'Mass', 'Luminosity', 'Temperature', 'Pressure', 'Density', 'Epsilon').
         """
-        plt.figure()
-        plt.plot(self.R / self.R_total, self.M / self.M[-1], label='Mass')
-        plt.plot(self.R / self.R_total, self.L / self.L[-1], label='Luminosity')
-        plt.plot(self.R / self.R_total, self.T / self.T[0], label='Temperature')
-        plt.plot(self.R / self.R_total, self.P / self.P[0], label='Pressure')
-        plt.plot(self.R / self.R_total, self.Rho / self.Rho[0], label='Density')
-        plt.xlabel('Radius ($10^{10}$ cm)')
-        plt.ylabel('Normalized Values')
-        plt.legend()
-        plt.grid()
-        plt.show()
+        if independent_variable == 'radius':
+            independent_variable = self.R / self.R_total
+            dependent_variable = self.M
+            label = 'Mass'
+            xlabel = "Normalized Radius"
+        elif independent_variable == 'mass':
+            independent_variable = self.M / self.M[-1]
+            dependent_variable = self.R
+            label = 'Radius'
+            xlabel = "Normalized Mass"
+        else:
+            print("Invalid independent variable. Please choose 'radius' or 'mass'.")
+
+        if variable == 'all':
+            plt.figure()
+            plt.plot(independent_variable, dependent_variable / dependent_variable[-1], label = label)
+            plt.plot(independent_variable, self.L / self.L[-1], label='Luminosity')
+            plt.plot(independent_variable, self.T / self.T[0], label='Temperature')
+            plt.plot(independent_variable, self.P / self.P[0], label='Pressure')
+            plt.plot(independent_variable, self.Rho / self.Rho[0], label='Density')
+            plt.xlabel(xlabel)
+            plt.ylabel('Normalized Values')
+            plt.legend()
+            plt.grid()
+            plt.show()
+
+        elif variable == 'Mass' or variable == 'Radius':
+            plt.figure()
+            plt.plot(independent_variable, dependent_variable)
+            plt.xlabel(xlabel)
+            plt.ylabel('Mass ($10^^{33} g$)')
+            plt.grid()
+            plt.show()
+
+        elif variable == 'Luminosity':
+            plt.figure()
+            plt.plot(independent_variable, self.L)
+            plt.xlabel(xlabel)
+            plt.ylabel('Luminosity ($10^{33} erg/s$)')
+            plt.grid()
+            plt.show()
+
+        elif variable == 'Temperature':
+            plt.figure()
+            plt.plot(independent_variable, self.T)
+            plt.xlabel(xlabel)
+            plt.ylabel('Temperature ($10^7 K$)')
+            plt.grid()
+            plt.show()
+
+        elif variable == 'Pressure':
+            plt.figure()
+            plt.plot(independent_variable, self.P)
+            plt.xlabel(xlabel)
+            plt.ylabel('Pressure ($10^{15} dyne/cm^2$)')
+            plt.grid()
+            plt.show()
+
+        elif variable == 'Density':
+            plt.figure()
+            plt.plot(independent_variable, self.Rho)
+            plt.xlabel(xlabel)
+            plt.ylabel('Density ($g/cm^3$)')
+            plt.grid()
+            plt.show()
+
+        elif variable == 'Epsilon':
+            plt.figure()
+            plt.plot(independent_variable, self.epsilon)
+            plt.xlabel(xlabel)
+            plt.ylabel('Energy Generation Rate ($erg/s/g$)')
+            plt.grid()
+            plt.show()
+
+        else:
+            print("Invalid variable. Please choose 'all', 'Mass', 'Luminosity', 'Temperature', 'Pressure', 'Density', or 'Epsilon'.")
 
     
     def save_data(self, filename):
